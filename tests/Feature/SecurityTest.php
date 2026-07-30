@@ -52,7 +52,9 @@ class SecurityTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
 
         $this->actingAs($recepcionista)->get(route('reportes.index'))->assertForbidden();
+        $this->actingAs($recepcionista)->get(route('reportes.pdf'))->assertForbidden();
         $this->actingAs($admin)->get(route('reportes.index'))->assertOk();
+        $this->actingAs($admin)->get(route('reportes.pdf'))->assertOk();
     }
 
     public function test_changes_are_audited_without_sensitive_password_data(): void

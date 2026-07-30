@@ -38,6 +38,8 @@ Route::middleware(['auth', 'active', 'rate.limit:180,60'])->group(function () {
         ->except(['show'])->middleware('role:admin,almacen');
     Route::get('/reportes', [ReporteController::class, 'index'])
         ->middleware(['role:admin', 'rate.limit:10,60'])->name('reportes.index');
+    Route::get('/reportes/pdf', [ReporteController::class, 'pdf'])
+        ->middleware(['role:admin', 'rate.limit:10,60'])->name('reportes.pdf');
     Route::get('/auditoria', [AuditLogController::class, 'index'])
         ->middleware(['role:admin', 'rate.limit:30,60'])->name('auditoria.index');
     Route::view('/ubicacion', 'ubicacion.index')->name('ubicacion.index');

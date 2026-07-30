@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Cliente;
+use App\Models\OrdenTrabajo;
 use App\Models\Repuesto;
 use App\Models\User;
 use App\Models\Vehiculo;
@@ -63,6 +64,45 @@ class GestionTallerTest extends TestCase
 
         $this->actingAs($user)->get(route('repuestos.index', ['alerta' => 'stock']))->assertOk()->assertSee('Filtro');
         $this->actingAs($user)->get(route('reportes.index'))->assertOk()->assertSee('Stock bajo');
+    }
+
+    public function test_admin_can_download_filtered_report_as_pdf(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $cliente = Cliente::create([
+            'nombre' => 'Cliente PDF',
+            'ci_nit' => 'PDF-1',
+            'telefono' => '70000001',
+            'ciudad' => 'Santa Cruz',
+            'activo' => true,
+        ]);
+        $vehiculo = Vehiculo::create([
+            'cliente_id' => $cliente->id,
+            'placa' => 'PDF-001',
+            'marca' => 'Toyota',
+            'modelo' => 'Yaris',
+            'anio' => 2023,
+            'kilometraje' => 12000,
+        ]);
+        $admin->ordenesTrabajo()->create([
+            'numero' => 'OT-PDF-001',
+            'cliente_id' => $cliente->id,
+            'vehiculo_id' => $vehiculo->id,
+            'problema' => 'Mantenimiento preventivo',
+            'estado' => 'Entregada',
+            'fecha_ingreso' => '2026-07-15',
+            'total' => 450,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('reportes.pdf', [
+            'desde' => '2026-07-01',
+            'hasta' => '2026-07-31',
+        ]));
+
+        $response->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertHeader('Content-Disposition', 'attachment; filename="informe-taller-2026-07-01_2026-07-31.pdf"');
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
     }
 
     public function test_client_with_vehicle_cannot_be_deleted(): void

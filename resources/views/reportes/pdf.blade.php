@@ -21,10 +21,10 @@
         .summaries > tbody > tr > td { vertical-align: top; width: 50%; }
         .summary-left { padding-right: 8px; }
         .summary-right { padding-left: 8px; }
-        .section-title { background: #1f2937; color: #fff; font-size: 10px; padding: 6px 8px; }
+        .section-title { background: #7f1d1d; color: #fff; font-size: 10px; padding: 6px 8px; }
         table.data { border-collapse: collapse; margin-bottom: 12px; width: 100%; }
         table.data thead { display: table-header-group; }
-        table.data th { background: #e5e7eb; color: #374151; font-size: 8px; padding: 5px; text-align: left; }
+        table.data th { background: #fff1f2; color: #7f1d1d; font-size: 8px; padding: 5px; text-align: left; }
         table.data td { border-bottom: 1px solid #e5e7eb; padding: 5px; vertical-align: top; }
         table.data tr { page-break-inside: avoid; }
         .number { text-align: right; white-space: nowrap; }

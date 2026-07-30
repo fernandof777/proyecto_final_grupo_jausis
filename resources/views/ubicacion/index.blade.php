@@ -9,7 +9,7 @@
       integrity="sha256-p4NxAoJBhIINfQ3ynhRdOZtD/miZyoHS5obTRR9BMY=" crossorigin="">
 <style>
     #mapa-taller { height: 420px; border-radius: 0 0 14px 14px; z-index: 1; }
-    .location-icon { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 14px; background: #dbeafe; color: #2563eb; font-size: 1.5rem; }
+    .location-icon { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 14px; background: #fee2e2; color: #b91c1c; font-size: 1.5rem; }
     .leaflet-popup-content { font-family: Inter, sans-serif; line-height: 1.5; }
     @media (max-width: 900px) { #mapa-taller { height: 360px; } }
     @media (max-width: 600px) {

@@ -56,7 +56,7 @@
 </div>
 
 <div class="row g-4">
-    <div class="col-lg-4">
+    <div class="col-xxl-4">
         <div class="card app-card h-100">
             <div class="card-body">
                 <h5 class="fw-bold">Órdenes por estado</h5>
@@ -71,7 +71,7 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-8">
+    <div class="col-xxl-8">
         <div class="card app-card">
             <div class="table-responsive">
                 <table class="table mb-0">

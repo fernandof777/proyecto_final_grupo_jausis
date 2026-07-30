@@ -34,15 +34,26 @@ fi
 
 php artisan package:discover --ansi
 
-until mysqladmin ping \
-    --host="${DB_HOST:-database}" \
-    --port="${DB_PORT:-3306}" \
-    --user="${DB_USERNAME:-root}" \
-    --password="${DB_PASSWORD:-root}" \
-    --silent; do
-    echo "Esperando a MySQL..."
-    sleep 2
-done
+if [ "${DB_CONNECTION:-mysql}" = "pgsql" ]; then
+    until pg_isready \
+        --host="${DB_HOST:-127.0.0.1}" \
+        --port="${DB_PORT:-5432}" \
+        --username="${DB_USERNAME:-postgres}" \
+        --dbname="${DB_DATABASE:-postgres}"; do
+        echo "Esperando a PostgreSQL..."
+        sleep 2
+    done
+else
+    until mysqladmin ping \
+        --host="${DB_HOST:-database}" \
+        --port="${DB_PORT:-3306}" \
+        --user="${DB_USERNAME:-root}" \
+        --password="${DB_PASSWORD:-root}" \
+        --silent; do
+        echo "Esperando a MySQL..."
+        sleep 2
+    done
+fi
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     php artisan migrate --force --no-interaction
@@ -53,4 +64,3 @@ if [ "${RUN_SEEDERS:-true}" = "true" ]; then
 fi
 
 exec "$@"
-

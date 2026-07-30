@@ -16,11 +16,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $adminEmail = env('ADMIN_EMAIL', 'luis@taller.com');
+        $adminPassword = env('ADMIN_PASSWORD', 'password123');
+
         $luis = User::firstOrCreate(
-            ['email' => 'luis@taller.com'],
+            ['email' => $adminEmail],
             [
                 'name' => 'Luis Fernando',
-                'password' => Hash::make('password123'),
+                'password' => Hash::make($adminPassword),
             ]
         );
         $luis->forceFill(['role' => 'admin', 'activo' => true])->save();

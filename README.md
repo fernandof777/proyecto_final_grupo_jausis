@@ -36,6 +36,19 @@ docker compose down
 Los datos de MySQL se conservan en el volumen `database_data`. Para detener
 los contenedores sin borrar la información usa `docker compose down`.
 
+## Despliegue en Render
+
+El archivo `render.yaml` configura automáticamente:
+
+- el servicio web Docker con Nginx y PHP-FPM;
+- una base PostgreSQL administrada;
+- migraciones y seeders durante el arranque;
+- comprobación de salud en `/up`;
+- variables seguras y despliegues automáticos desde `main`.
+
+En Render selecciona **New > Blueprint**, conecta este repositorio y proporciona
+una contraseña segura cuando Render solicite `ADMIN_PASSWORD`.
+
 Aplicación web para la gestión integral de un taller automotriz. Este proyecto
 unifica la autenticación y el módulo de servicios con la dirección visual,
 wireframes y mockups elaborados para el proyecto académico.

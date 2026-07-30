@@ -1,0 +1,69 @@
+services:
+  - type: web
+    name: grupo-los-jausis
+    runtime: docker
+    repo: https://github.com/fernandof777/proyecto_final_grupo_jausis
+    branch: main
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /up
+    autoDeployTrigger: commit
+    envVars:
+      - key: APP_NAME
+        value: Grupo Los Jausis
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY_RAW
+        generateValue: true
+      - key: APP_LOCALE
+        value: es
+      - key: APP_FALLBACK_LOCALE
+        value: es
+      - key: APP_FAKER_LOCALE
+        value: es_ES
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: warning
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: grupo-jausis-db
+          property: connectionString
+      - key: SESSION_DRIVER
+        value: database
+      - key: SESSION_ENCRYPT
+        value: "true"
+      - key: SESSION_SECURE_COOKIE
+        value: "true"
+      - key: SESSION_SAME_SITE
+        value: lax
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: FILESYSTEM_DISK
+        value: local
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: RUN_SEEDERS
+        value: "true"
+      - key: ADMIN_EMAIL
+        value: admin@grupojausis.com
+      - key: ADMIN_PASSWORD
+        sync: false
+
+databases:
+  - name: grupo-jausis-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "18"
+    databaseName: grupo_jausis
+    user: grupo_jausis
+    ipAllowList: []
+

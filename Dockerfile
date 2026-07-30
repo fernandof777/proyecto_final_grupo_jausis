@@ -7,8 +7,10 @@ RUN apt-get update \
         libcurl4-openssl-dev \
         libicu-dev \
         libonig-dev \
+        libpq-dev \
         libxml2-dev \
         libzip-dev \
+        postgresql-client \
         unzip \
     && docker-php-ext-install -j"$(nproc)" \
         bcmath \
@@ -19,6 +21,7 @@ RUN apt-get update \
         opcache \
         pcntl \
         pdo_mysql \
+        pdo_pgsql \
         xml \
         zip \
     && apt-get clean \
@@ -52,3 +55,19 @@ FROM nginx:1.27-alpine AS web
 
 COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=app /var/www/html/public /var/www/html/public
+
+FROM app AS render
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gettext-base nginx supervisor \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /etc/nginx/sites-enabled/default
+
+COPY docker/render/nginx.conf.template /etc/nginx/templates/render.conf.template
+COPY docker/render/supervisord.conf /etc/supervisor/conf.d/render.conf
+COPY docker/render/entrypoint.sh /usr/local/bin/render-entrypoint
+
+RUN chmod +x /usr/local/bin/render-entrypoint
+
+ENTRYPOINT ["render-entrypoint"]
+CMD ["/usr/bin/supervisord", "--nodaemon", "--configuration", "/etc/supervisor/conf.d/render.conf"]

@@ -3,11 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Cliente;
-use App\Models\OrdenTrabajo;
 use App\Models\Repuesto;
 use App\Models\User;
 use App\Models\Vehiculo;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PDOException;
 use Tests\TestCase;
 
 class GestionTallerTest extends TestCase
@@ -55,6 +56,149 @@ class GestionTallerTest extends TestCase
         ])->assertSessionHasErrors('vehiculo_id');
 
         $this->assertDatabaseCount('ordenes_trabajo', 0);
+    }
+
+    public function test_new_order_rejects_a_past_entry_date(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $cliente = Cliente::create(['nombre' => 'Cliente', 'ci_nit' => 'F-1', 'telefono' => '70000000', 'ciudad' => 'SC', 'activo' => true]);
+        $vehiculo = Vehiculo::create(['cliente_id' => $cliente->id, 'placa' => 'FECHA-1', 'marca' => 'Toyota', 'modelo' => 'Yaris', 'anio' => 2022, 'kilometraje' => 100]);
+
+        $this->actingAs($user)->post(route('ordenes.store'), [
+            'cliente_id' => $cliente->id,
+            'vehiculo_id' => $vehiculo->id,
+            'problema' => 'Revisión general',
+            'estado' => 'Pendiente',
+            'fecha_ingreso' => now()->subDay()->toDateString(),
+            'total' => 0,
+        ])->assertSessionHasErrors('fecha_ingreso');
+
+        $this->assertDatabaseCount('ordenes_trabajo', 0);
+    }
+
+    public function test_order_dates_accept_same_day_and_reject_delivery_before_entry(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $cliente = Cliente::create(['nombre' => 'Cliente fechas', 'ci_nit' => 'F-2', 'telefono' => '70000001', 'ciudad' => 'SC', 'activo' => true]);
+        $vehiculo = Vehiculo::create(['cliente_id' => $cliente->id, 'placa' => 'FECHA-2', 'marca' => 'Nissan', 'modelo' => 'Versa', 'anio' => 2021, 'kilometraje' => 100]);
+        $hoy = now()->toDateString();
+
+        $this->actingAs($user)->post(route('ordenes.store'), [
+            'cliente_id' => $cliente->id,
+            'vehiculo_id' => $vehiculo->id,
+            'problema' => 'Mantenimiento',
+            'estado' => 'Pendiente',
+            'fecha_ingreso' => $hoy,
+            'fecha_entrega_estimada' => $hoy,
+            'total' => 0,
+        ])->assertRedirect(route('ordenes.index'));
+
+        $this->actingAs($user)->post(route('ordenes.store'), [
+            'cliente_id' => $cliente->id,
+            'vehiculo_id' => $vehiculo->id,
+            'problema' => 'Segunda revisión',
+            'estado' => 'Pendiente',
+            'fecha_ingreso' => now()->addDay()->toDateString(),
+            'fecha_entrega_estimada' => $hoy,
+            'total' => 0,
+        ])->assertSessionHasErrors('fecha_entrega_estimada');
+
+        $this->assertDatabaseCount('ordenes_trabajo', 1);
+    }
+
+    public function test_updating_order_rejects_vehicle_from_another_client(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $cliente = Cliente::create(['nombre' => 'Titular', 'ci_nit' => 'REL-1', 'telefono' => '70000002', 'ciudad' => 'SC', 'activo' => true]);
+        $otro = Cliente::create(['nombre' => 'Otro', 'ci_nit' => 'REL-2', 'telefono' => '70000003', 'ciudad' => 'SC', 'activo' => true]);
+        $vehiculo = Vehiculo::create(['cliente_id' => $cliente->id, 'placa' => 'REL-A', 'marca' => 'Kia', 'modelo' => 'Rio', 'anio' => 2020, 'kilometraje' => 10]);
+        $vehiculoAjeno = Vehiculo::create(['cliente_id' => $otro->id, 'placa' => 'REL-B', 'marca' => 'Ford', 'modelo' => 'Ka', 'anio' => 2019, 'kilometraje' => 10]);
+        $orden = $user->ordenesTrabajo()->create([
+            'numero' => 'OT-REL-01',
+            'cliente_id' => $cliente->id,
+            'vehiculo_id' => $vehiculo->id,
+            'problema' => 'Prueba',
+            'estado' => 'Pendiente',
+            'fecha_ingreso' => now()->toDateString(),
+            'total' => 0,
+        ]);
+
+        $this->actingAs($user)->put(route('ordenes.update', $orden), [
+            'cliente_id' => $cliente->id,
+            'vehiculo_id' => $vehiculoAjeno->id,
+            'problema' => 'Prueba',
+            'estado' => 'Pendiente',
+            'fecha_ingreso' => now()->toDateString(),
+            'total' => 0,
+        ])->assertSessionHasErrors('vehiculo_id');
+
+        $this->assertDatabaseHas('ordenes_trabajo', [
+            'id' => $orden->id,
+            'vehiculo_id' => $vehiculo->id,
+        ]);
+    }
+
+    public function test_client_database_error_returns_a_friendly_message(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        Cliente::creating(function (): void {
+            throw new QueryException(
+                'sqlite',
+                'insert into clientes',
+                [],
+                new PDOException('Restricción de base de datos'),
+            );
+        });
+
+        $this->actingAs($user)
+            ->from(route('clientes.create'))
+            ->post(route('clientes.store'), [
+                'nombre' => 'Cliente inválido',
+                'ci_nit' => 'DB-ERROR',
+                'telefono' => '70000004',
+                'email' => 'cliente@example.com',
+                'ciudad' => 'Santa Cruz',
+                'direccion' => null,
+                'activo' => 1,
+            ])
+            ->assertRedirect(route('clientes.create'))
+            ->assertSessionHas('error', 'No se pudo registrar el cliente. Verifica que los datos sean válidos e inténtalo nuevamente.');
+
+        $this->assertDatabaseCount('clientes', 0);
+    }
+
+    public function test_client_data_is_normalized_and_duplicate_ci_is_rejected(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($user)->post(route('clientes.store'), [
+            'nombre' => '  Ana Pérez  ',
+            'ci_nit' => 'abc-123',
+            'telefono' => ' 70000005 ',
+            'email' => ' ANA@EXAMPLE.COM ',
+            'ciudad' => ' Santa Cruz ',
+            'direccion' => ' Centro ',
+            'activo' => 1,
+        ])->assertRedirect(route('clientes.index'));
+
+        $this->assertDatabaseHas('clientes', [
+            'nombre' => 'Ana Pérez',
+            'ci_nit' => 'ABC-123',
+            'telefono' => '70000005',
+            'email' => 'ana@example.com',
+            'ciudad' => 'Santa Cruz',
+            'direccion' => 'Centro',
+        ]);
+
+        $this->actingAs($user)->post(route('clientes.store'), [
+            'nombre' => 'Otro cliente',
+            'ci_nit' => 'abc-123',
+            'telefono' => '70000006',
+            'ciudad' => 'Santa Cruz',
+            'activo' => 1,
+        ])->assertSessionHasErrors('ci_nit');
+
+        $this->assertDatabaseCount('clientes', 1);
     }
 
     public function test_inventory_and_reports_are_available(): void

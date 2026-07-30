@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Cliente;
 use App\Models\OrdenTrabajo;
 use App\Models\Vehiculo;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class OrdenTrabajoController extends Controller
@@ -30,9 +32,17 @@ class OrdenTrabajoController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $this->validated($request);
-        $data['numero'] = 'OT-'.now()->format('ymd').'-'.Str::upper(Str::random(5));
-        $request->user()->ordenesTrabajo()->create($data);
+        try {
+            $data = $this->validated($request);
+            $data['numero'] = 'OT-'.now()->format('ymd').'-'.Str::upper(Str::random(5));
+            $request->user()->ordenesTrabajo()->create($data);
+        } catch (QueryException $exception) {
+            report($exception);
+
+            return back()
+                ->withInput()
+                ->with('error', 'No se pudo guardar la orden. Verifica que los datos sean válidos e inténtalo nuevamente.');
+        }
 
         return to_route('ordenes.index')->with('success', 'Orden de trabajo creada correctamente.');
     }
@@ -44,7 +54,15 @@ class OrdenTrabajoController extends Controller
 
     public function update(Request $request, OrdenTrabajo $orden): RedirectResponse
     {
-        $orden->update($this->validated($request));
+        try {
+            $orden->update($this->validated($request, $orden));
+        } catch (QueryException $exception) {
+            report($exception);
+
+            return back()
+                ->withInput()
+                ->with('error', 'No se pudo actualizar la orden. Verifica que los datos sean válidos e inténtalo nuevamente.');
+        }
 
         return to_route('ordenes.index')->with('success', 'Orden actualizada correctamente.');
     }
@@ -65,18 +83,47 @@ class OrdenTrabajoController extends Controller
         ]);
     }
 
-    private function validated(Request $request): array
+    private function validated(Request $request, ?OrdenTrabajo $orden = null): array
     {
-        return $request->validate([
-            'cliente_id' => ['required', 'exists:clientes,id'],
-            'vehiculo_id' => ['required', Rule::exists('vehiculos', 'id')->where('cliente_id', $request->cliente_id)],
+        $fechaIngresoRules = ['required', 'date_format:Y-m-d'];
+        $fechaOriginal = $orden?->fecha_ingreso?->format('Y-m-d');
+
+        if (! $orden || $request->input('fecha_ingreso') !== $fechaOriginal) {
+            $fechaIngresoRules[] = 'after_or_equal:today';
+        }
+
+        $data = $request->validate([
+            'cliente_id' => ['required', 'integer', Rule::exists('clientes', 'id')->where('activo', true)],
+            'vehiculo_id' => [
+                'required',
+                'integer',
+                Rule::exists('vehiculos', 'id')
+                    ->where(fn ($query) => $query->where('cliente_id', $request->integer('cliente_id'))),
+            ],
             'problema' => ['required', 'string', 'max:2000'],
             'diagnostico' => ['nullable', 'string', 'max:3000'],
             'estado' => ['required', Rule::in(['Pendiente', 'En diagnóstico', 'En reparación', 'Finalizada', 'Entregada', 'Cancelada'])],
-            'fecha_ingreso' => ['required', 'date'],
-            'fecha_entrega_estimada' => ['nullable', 'date', 'after_or_equal:fecha_ingreso'],
-            'fecha_entrega' => ['nullable', 'date', 'after_or_equal:fecha_ingreso'],
+            'fecha_ingreso' => $fechaIngresoRules,
+            'fecha_entrega_estimada' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:fecha_ingreso'],
+            'fecha_entrega' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:fecha_ingreso'],
             'total' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
-        ], ['vehiculo_id.exists' => 'El vehículo seleccionado no pertenece al cliente.']);
+        ], [
+            'cliente_id.exists' => 'El cliente seleccionado no existe o está inactivo.',
+            'vehiculo_id.exists' => 'El vehículo seleccionado no pertenece al cliente.',
+            'fecha_ingreso.after_or_equal' => 'La fecha de ingreso de una orden nueva no puede estar en el pasado.',
+            'fecha_ingreso.date_format' => 'La fecha de ingreso no tiene un formato válido.',
+            'fecha_entrega_estimada.after_or_equal' => 'La entrega estimada debe ser igual o posterior a la fecha de ingreso.',
+            'fecha_entrega.after_or_equal' => 'La entrega real debe ser igual o posterior a la fecha de ingreso.',
+            'fecha_entrega_estimada.date_format' => 'La fecha de entrega estimada no tiene un formato válido.',
+            'fecha_entrega.date_format' => 'La fecha de entrega real no tiene un formato válido.',
+        ]);
+
+        if ($data['estado'] === 'Entregada' && empty($data['fecha_entrega'])) {
+            throw ValidationException::withMessages([
+                'fecha_entrega' => 'Indica la fecha de entrega real cuando la orden está Entregada.',
+            ]);
+        }
+
+        return $data;
     }
 }

@@ -35,11 +35,21 @@ fi
 php artisan package:discover --ansi
 
 if [ "${DB_CONNECTION:-mysql}" = "pgsql" ]; then
-    until pg_isready \
-        --host="${DB_HOST:-127.0.0.1}" \
-        --port="${DB_PORT:-5432}" \
-        --username="${DB_USERNAME:-postgres}" \
-        --dbname="${DB_DATABASE:-postgres}"; do
+    if [ -n "${DB_URL:-}" ]; then
+        postgres_ready() {
+            pg_isready --dbname="$DB_URL"
+        }
+    else
+        postgres_ready() {
+            pg_isready \
+                --host="${DB_HOST:-127.0.0.1}" \
+                --port="${DB_PORT:-5432}" \
+                --username="${DB_USERNAME:-postgres}" \
+                --dbname="${DB_DATABASE:-postgres}"
+        }
+    fi
+
+    until postgres_ready; do
         echo "Esperando a PostgreSQL..."
         sleep 2
     done

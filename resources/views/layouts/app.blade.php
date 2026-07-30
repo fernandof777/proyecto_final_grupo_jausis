@@ -295,6 +295,7 @@
         </a>
         <div class="nav-label">GESTIÓN</div>
         @if(Auth::user()->hasRole('admin','recepcionista'))
+        <a class="side-link {{ request()->routeIs('reservas.*') ? 'active' : '' }}" href="{{ route('reservas.index') }}"><i class="bi bi-calendar2-check"></i><span>Reservas</span></a>
         <a class="side-link {{ request()->routeIs('clientes.*') ? 'active' : '' }}" href="{{ route('clientes.index') }}"><i class="bi bi-people"></i><span>Clientes</span></a>
         <a class="side-link {{ request()->routeIs('vehiculos.*') ? 'active' : '' }}" href="{{ route('vehiculos.index') }}"><i class="bi bi-car-front"></i><span>Vehículos</span></a>
         <a class="side-link {{ request()->routeIs('ordenes.*') ? 'active' : '' }}" href="{{ route('ordenes.index') }}"><i class="bi bi-clipboard2-check"></i><span>Órdenes</span></a>
@@ -307,6 +308,7 @@
         <a class="side-link {{ request()->routeIs('auditoria.*') ? 'active' : '' }}" href="{{ route('auditoria.index') }}"><i class="bi bi-shield-check"></i><span>Auditoría</span></a>
         @endif
         <a class="side-link {{ request()->routeIs('ubicacion.*') ? 'active' : '' }}" href="{{ route('ubicacion.index') }}"><i class="bi bi-geo-alt"></i><span>Ubicación</span></a>
+        <a class="side-link" href="{{ route('inicio') }}" target="_blank"><i class="bi bi-globe2"></i><span>Sitio público</span></a>
     </aside>
     <main class="main">
         <header class="topbar">

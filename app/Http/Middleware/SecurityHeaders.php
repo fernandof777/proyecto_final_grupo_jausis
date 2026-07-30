@@ -13,13 +13,16 @@ class SecurityHeaders
         $nonce = base64_encode(random_bytes(16));
         view()->share('cspNonce', $nonce);
         $response = $next($request);
+        $viteSources = app()->environment('local')
+            ? ' http://localhost:5173 ws://localhost:5173'
+            : '';
         $csp = implode('; ', [
             "default-src 'self'",
-            "script-src 'self' 'nonce-{$nonce}' https://cdn.jsdelivr.net https://unpkg.com",
+            "script-src 'self' 'nonce-{$nonce}' https://cdn.jsdelivr.net https://unpkg.com{$viteSources}",
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com",
             "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com",
             "img-src 'self' data: https://*.tile.openstreetmap.org https://unpkg.com",
-            "connect-src 'self'",
+            "connect-src 'self'{$viteSources}",
             "frame-ancestors 'none'",
             "base-uri 'self'",
             "form-action 'self'",

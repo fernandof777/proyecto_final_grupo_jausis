@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('titulo', 'Panel') | TallerPro</title>
+    <title>@yield('titulo', 'Panel') | {{ config('app.name', 'Grupo Los Jausis') }}</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%232563eb%22/><text x=%2232%22 y=%2241%22 text-anchor=%22middle%22 font-size=%2228%22 font-family=%22Arial%22 font-weight=%22700%22 fill=%22white%22>GJ</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -77,7 +78,7 @@
     <aside class="sidebar">
         <a class="brand" href="{{ route('dashboard') }}">
             <span class="brand-mark"><i class="bi bi-wrench-adjustable"></i></span>
-            <span>TallerPro</span>
+            <span>{{ config('app.name', 'Grupo Los Jausis') }}</span>
         </a>
         <div class="nav-label">PRINCIPAL</div>
         <a class="side-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}">

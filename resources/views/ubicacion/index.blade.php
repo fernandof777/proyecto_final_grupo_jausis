@@ -22,7 +22,7 @@
 @section('contenido')
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
     <div>
-        <h2 class="fw-bold mb-1">Visítanos en TallerPro</h2>
+        <h2 class="fw-bold mb-1">Visítanos en Grupo Los Jausis</h2>
         <p class="text-secondary mb-0">Consulta el mapa, acerca la vista o abre las indicaciones en Google Maps.</p>
     </div>
     <a class="btn btn-primary px-4"
@@ -58,7 +58,7 @@
         <h5 class="fw-bold mb-1">Mapa interactivo</h5>
         <small class="text-secondary">Arrastra el mapa y utiliza los controles para explorar los alrededores.</small>
     </div>
-    <div id="mapa-taller" role="application" aria-label="Mapa interactivo con la ubicación de TallerPro"></div>
+    <div id="mapa-taller" role="application" aria-label="Mapa interactivo con la ubicación de Grupo Los Jausis"></div>
 </div>
 @endsection
 
@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     L.marker(coordenadas)
         .addTo(mapa)
-        .bindPopup('<strong>TallerPro</strong><br>6RRG+77G, Av. Beni<br>Santa Cruz de la Sierra')
+        .bindPopup('<strong>Grupo Los Jausis</strong><br>6RRG+77G, Av. Beni<br>Santa Cruz de la Sierra')
         .openPopup();
 
     mapa.on('focus', () => mapa.scrollWheelZoom.enable());

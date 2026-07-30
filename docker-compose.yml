@@ -1,0 +1,95 @@
+services:
+  app:
+    build:
+      context: .
+      target: app
+    environment:
+      APP_NAME: "Grupo Los Jausis"
+      APP_ENV: local
+      APP_KEY: "${APP_KEY:-}"
+      APP_DEBUG: "true"
+      APP_URL: "http://localhost:8001"
+      APP_LOCALE: es
+      APP_FALLBACK_LOCALE: es
+      APP_FAKER_LOCALE: es_ES
+      LOG_CHANNEL: stack
+      LOG_LEVEL: debug
+      DB_CONNECTION: mysql
+      DB_HOST: database
+      DB_PORT: "3306"
+      DB_DATABASE: tallerpro
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      FILESYSTEM_DISK: local
+      RUN_MIGRATIONS: "true"
+      RUN_SEEDERS: "true"
+    volumes:
+      - ./:/var/www/html
+      - vendor_data:/var/www/html/vendor
+      - app_storage:/var/www/html/storage
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      target: web
+    ports:
+      - "8001:80"
+    volumes:
+      - ./public:/var/www/html/public:ro
+      - app_storage:/var/www/html/storage:ro
+    depends_on:
+      app:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/up"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  database:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_DATABASE: tallerpro
+    ports:
+      - "3308:3306"
+    volumes:
+      - database_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  vite:
+    image: node:22-alpine
+    working_dir: /var/www/html
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_APP_NAME: "Grupo Los Jausis"
+      VITE_HMR_HOST: localhost
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./:/var/www/html
+      - node_modules_data:/var/www/html/node_modules
+    restart: unless-stopped
+
+volumes:
+  app_storage:
+  database_data:
+  node_modules_data:
+  vendor_data:
+

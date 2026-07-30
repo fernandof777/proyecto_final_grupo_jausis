@@ -1,4 +1,40 @@
-# TallerPro
+# Grupo Los Jausis
+
+## Ejecución con Docker
+
+Requisitos:
+
+- Docker Desktop con WSL 2 y virtualización habilitada.
+- Puertos `8001`, `3308` y `5173` disponibles.
+
+Iniciar todo el sistema:
+
+```bash
+docker compose up -d
+```
+
+La aplicación quedará disponible en
+[http://localhost:8001](http://localhost:8001). Durante el primer arranque,
+Docker instala las dependencias, crea las tablas y ejecuta los seeders.
+
+Credenciales iniciales:
+
+- Administrador: `luis@taller.com`
+- Contraseña: `password123`
+
+Comandos útiles:
+
+```bash
+docker compose ps
+docker compose logs -f
+docker compose exec app php artisan migrate
+docker compose exec app php artisan db:seed
+docker compose exec app php artisan test
+docker compose down
+```
+
+Los datos de MySQL se conservan en el volumen `database_data`. Para detener
+los contenedores sin borrar la información usa `docker compose down`.
 
 Aplicación web para la gestión integral de un taller automotriz. Este proyecto
 unifica la autenticación y el módulo de servicios con la dirección visual,

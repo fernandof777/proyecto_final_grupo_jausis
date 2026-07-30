@@ -8,7 +8,7 @@
         <div class="card-body p-4 p-md-5">
             <div class="text-center mb-4">
                 <div class="brand-mark mx-auto mb-3"><i class="bi bi-wrench-adjustable"></i></div>
-                <h2 class="fw-bold">TallerPro</h2>
+                <h2 class="fw-bold">{{ config('app.name', 'Grupo Los Jausis') }}</h2>
                 <p class="text-white-50">Gestión inteligente para tu taller</p>
             </div>
             @if ($errors->any())

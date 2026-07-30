@@ -26,9 +26,11 @@
                 </div>
                 <button class="btn btn-primary btn-lg w-100" type="submit">Iniciar sesión <i class="bi bi-arrow-right ms-2"></i></button>
             </form>
-            <div class="border-top border-secondary mt-4 pt-3 text-center text-white-50 small">
-                Usuario inicial: luis@taller.com / password123
-            </div>
+            @env('local')
+                <div class="border-top border-secondary mt-4 pt-3 text-center text-white-50 small">
+                    Usuario inicial: luis@taller.com / password123
+                </div>
+            @endenv
         </div>
     </div>
 </div>

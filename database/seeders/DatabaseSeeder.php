@@ -19,7 +19,7 @@ class DatabaseSeeder extends Seeder
         $adminEmail = env('ADMIN_EMAIL', 'luis@taller.com');
         $adminPassword = env('ADMIN_PASSWORD', 'password123');
 
-        $luis = User::firstOrCreate(
+        $luis = User::updateOrCreate(
             ['email' => $adminEmail],
             [
                 'name' => 'Luis Fernando',

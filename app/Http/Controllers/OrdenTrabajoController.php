@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Cliente;
 use App\Models\OrdenTrabajo;
+use App\Models\Repuesto;
 use App\Models\Vehiculo;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -34,8 +36,13 @@ class OrdenTrabajoController extends Controller
     {
         try {
             $data = $this->validated($request);
-            $data['numero'] = 'OT-'.now()->format('ymd').'-'.Str::upper(Str::random(5));
-            $request->user()->ordenesTrabajo()->create($data);
+            $repuestos = $this->repuestosSolicitados($request);
+            $numero = 'OT-'.now()->format('ymd').'-'.Str::upper(Str::random(5));
+
+            DB::transaction(function () use ($request, $data, $numero, $repuestos) {
+                $orden = $request->user()->ordenesTrabajo()->create($data + ['numero' => $numero]);
+                $this->aplicarRepuestos($orden, $repuestos);
+            });
         } catch (QueryException $exception) {
             report($exception);
 
@@ -55,7 +62,14 @@ class OrdenTrabajoController extends Controller
     public function update(Request $request, OrdenTrabajo $orden): RedirectResponse
     {
         try {
-            $orden->update($this->validated($request, $orden));
+            $data = $this->validated($request, $orden);
+            $repuestos = $this->repuestosSolicitados($request);
+
+            DB::transaction(function () use ($orden, $data, $repuestos) {
+                $this->liberarRepuestos($orden);
+                $orden->update($data);
+                $this->aplicarRepuestos($orden, $repuestos);
+            });
         } catch (QueryException $exception) {
             report($exception);
 
@@ -69,18 +83,130 @@ class OrdenTrabajoController extends Controller
 
     public function destroy(OrdenTrabajo $orden): RedirectResponse
     {
-        $orden->delete();
+        DB::transaction(function () use ($orden) {
+            $this->liberarRepuestos($orden);
+            $orden->delete();
+        });
 
         return back()->with('success', 'Orden eliminada.');
     }
 
     private function form(OrdenTrabajo $orden): View
     {
+        $orden->loadMissing('repuestos');
+
+        // Cantidades que la propia orden ya tiene reservadas (0 si es una orden nueva).
+        // Se suman al stock actual para mostrar el "disponible real" al editar,
+        // ya que esa cantidad se libera y se vuelve a validar al guardar.
+        $cantidadesActuales = $orden->repuestos->pluck('pivot.cantidad', 'id');
+
+        $repuestosDisponibles = Repuesto::where('activo', true)->orderBy('nombre')->get()
+            ->each(function (Repuesto $repuesto) use ($cantidadesActuales) {
+                $repuesto->disponible = $repuesto->stock + (int) ($cantidadesActuales[$repuesto->id] ?? 0);
+            });
+
         return view('ordenes.form', [
             'orden' => $orden,
             'clientes' => Cliente::where('activo', true)->orderBy('nombre')->get(),
             'vehiculos' => Vehiculo::with('cliente')->orderBy('placa')->get(),
+            'repuestosDisponibles' => $repuestosDisponibles,
         ]);
+    }
+
+    /**
+     * Extrae y normaliza la lista de repuestos enviada desde el formulario.
+     */
+    private function repuestosSolicitados(Request $request): array
+    {
+        $request->validate([
+            'repuestos' => ['nullable', 'array'],
+            'repuestos.*.id' => [
+                'required_with:repuestos',
+                'integer',
+                'distinct',
+                Rule::exists('repuestos', 'id')->where('activo', true),
+            ],
+            'repuestos.*.cantidad' => ['required_with:repuestos', 'integer', 'min:1', 'max:100000'],
+        ], [
+            'repuestos.*.id.exists' => 'Uno de los repuestos seleccionados no existe o está inactivo.',
+            'repuestos.*.id.distinct' => 'No puedes seleccionar el mismo repuesto más de una vez.',
+            'repuestos.*.cantidad.min' => 'La cantidad de cada repuesto debe ser mayor a cero.',
+        ]);
+
+        return collect($request->input('repuestos', []))
+            ->filter(fn ($item) => filled($item['id'] ?? null) && (int) ($item['cantidad'] ?? 0) > 0)
+            ->map(fn ($item) => ['id' => (int) $item['id'], 'cantidad' => (int) $item['cantidad']])
+            ->unique('id')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Descuenta del stock los repuestos solicitados y los asocia a la orden.
+     * Bloquea las filas de repuestos para evitar condiciones de carrera entre
+     * órdenes concurrentes que soliciten el mismo repuesto.
+     */
+    private function aplicarRepuestos(OrdenTrabajo $orden, array $items): void
+    {
+        if (empty($items)) {
+            return;
+        }
+
+        $ids = collect($items)->pluck('id');
+
+        $repuestos = Repuesto::whereIn('id', $ids)
+            ->where('activo', true)
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        foreach ($items as $item) {
+            $repuesto = $repuestos->get($item['id']);
+
+            if (! $repuesto) {
+                throw ValidationException::withMessages([
+                    'repuestos' => 'Uno de los repuestos seleccionados no existe o está inactivo.',
+                ]);
+            }
+
+            if ($item['cantidad'] > $repuesto->stock) {
+                throw ValidationException::withMessages([
+                    'repuestos' => "No hay stock suficiente de \"{$repuesto->nombre}\". Disponible: {$repuesto->stock}, solicitado: {$item['cantidad']}.",
+                ]);
+            }
+
+            $repuesto->decrement('stock', $item['cantidad']);
+
+            $orden->repuestos()->attach($repuesto->id, [
+                'cantidad' => $item['cantidad'],
+                'precio_unitario' => $repuesto->precio,
+            ]);
+        }
+    }
+
+    /**
+     * Devuelve al stock las cantidades previamente asignadas a la orden y
+     * elimina las asociaciones, dejando el inventario como si la orden no
+     * hubiese consumido repuestos.
+     */
+    private function liberarRepuestos(OrdenTrabajo $orden): void
+    {
+        $asignados = $orden->repuestos()->get();
+
+        if ($asignados->isEmpty()) {
+            return;
+        }
+
+        $repuestos = Repuesto::whereIn('id', $asignados->pluck('id'))
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        foreach ($asignados as $asignado) {
+            $repuestos->get($asignado->id)?->increment('stock', (int) $asignado->pivot->cantidad);
+        }
+
+        $orden->repuestos()->detach();
     }
 
     private function validated(Request $request, ?OrdenTrabajo $orden = null): array

@@ -20,7 +20,7 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ $edit ? route('ordenes.update', $orden) : route('ordenes.store') }}">
+        <form id="orden-form" method="POST" action="{{ $edit ? route('ordenes.update', $orden) : route('ordenes.store') }}">
             @csrf
             @if($edit) @method('PUT') @endif
 
@@ -128,6 +128,39 @@
                 </div>
             </div>
 
+            <hr class="my-4">
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="fw-bold mb-0">Repuestos de stock utilizados</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="btn-agregar-repuesto">
+                    <i class="bi bi-plus-lg"></i> Agregar repuesto
+                </button>
+            </div>
+            <div class="form-text mb-2">Solo puedes usar la cantidad disponible en inventario. El stock se descuenta al guardar la orden.</div>
+
+            @error('repuestos')<div class="alert alert-danger">{{ $message }}</div>@enderror
+
+            <div class="table-responsive">
+                <table class="table table-sm align-middle" id="tabla-repuestos">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width:260px">Repuesto</th>
+                            <th style="width:140px">Disponible</th>
+                            <th style="width:140px">Cantidad</th>
+                            <th style="width:120px">Subtotal (Bs)</th>
+                            <th style="width:50px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="repuestos-filas"></tbody>
+                    <tfoot>
+                        <tr id="repuestos-vacio">
+                            <td colspan="5" class="text-center text-secondary py-3">No se han agregado repuestos a esta orden.</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div class="text-end text-secondary" id="repuestos-total">Subtotal repuestos: Bs 0.00</div>
+
             <div class="d-flex justify-content-end gap-2 mt-4">
                 <a class="btn btn-light" href="{{ route('ordenes.index') }}">Cancelar</a>
                 <button class="btn btn-primary" type="submit">Guardar orden</button>
@@ -186,5 +219,128 @@ estadoSelect.addEventListener('change', sincronizarEstado);
 filtrarVehiculos();
 sincronizarFechas();
 sincronizarEstado();
+
+(function () {
+    const repuestos = @json($repuestosDisponibles->map(fn ($r) => [
+        'id' => $r->id,
+        'nombre' => $r->nombre,
+        'codigo' => $r->codigo,
+        'disponible' => (int) $r->disponible,
+        'precio' => (float) $r->precio,
+    ])->values());
+
+    const seleccionInicial = @json(
+        collect(old('repuestos', $orden->repuestos->map(fn ($r) => ['id' => $r->id, 'cantidad' => $r->pivot->cantidad])->all()))
+            ->map(fn ($item) => ['id' => (int) ($item['id'] ?? 0), 'cantidad' => max(1, (int) ($item['cantidad'] ?? 1))])
+            ->filter(fn ($item) => $item['id'] > 0)
+            ->values()
+    );
+
+    const cuerpo = document.getElementById('repuestos-filas');
+    const filaVacia = document.getElementById('repuestos-vacio');
+    const totalTexto = document.getElementById('repuestos-total');
+    const btnAgregar = document.getElementById('btn-agregar-repuesto');
+
+    let filas = [];
+    let contador = 0;
+
+    const escapar = (texto) => String(texto).replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+
+    const repuestoPorId = (id) => repuestos.find((r) => r.id === Number(id));
+    const idsUsados = (exceptoRowId) => filas.filter((f) => f.rowId !== exceptoRowId).map((f) => f.repuestoId);
+
+    function agregarFila(repuestoId, cantidad) {
+        contador += 1;
+        filas.push({ rowId: contador, repuestoId: repuestoId ? Number(repuestoId) : null, cantidad: cantidad || 1 });
+        render();
+    }
+
+    function eliminarFila(rowId) {
+        filas = filas.filter((f) => f.rowId !== rowId);
+        render();
+    }
+
+    function render() {
+        cuerpo.innerHTML = '';
+        filaVacia.classList.toggle('d-none', filas.length > 0);
+
+        let total = 0;
+
+        filas.forEach((fila) => {
+            const usados = idsUsados(fila.rowId);
+            const repuesto = repuestoPorId(fila.repuestoId);
+
+            const opciones = repuestos
+                .filter((r) => (r.disponible > 0 || r.id === fila.repuestoId) && !usados.includes(r.id))
+                .map((r) => `<option value="${r.id}" ${r.id === fila.repuestoId ? 'selected' : ''}>${escapar(r.codigo)} · ${escapar(r.nombre)} (disp. ${r.disponible})</option>`)
+                .join('');
+
+            const disponible = repuesto ? repuesto.disponible : 0;
+            const cantidad = Math.min(fila.cantidad, disponible || fila.cantidad);
+            const excedeStock = repuesto && fila.cantidad > disponible;
+            const subtotal = repuesto ? repuesto.precio * fila.cantidad : 0;
+            total += subtotal;
+
+            const nombreId = repuesto ? `name="repuestos[${fila.rowId}][id]"` : '';
+            const nombreCantidad = repuesto ? `name="repuestos[${fila.rowId}][cantidad]"` : '';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>
+                    <select class="form-select form-select-sm" data-role="repuesto" ${nombreId}>
+                        <option value="">Seleccionar repuesto</option>
+                        ${opciones}
+                    </select>
+                </td>
+                <td class="text-center" data-role="disponible">${repuesto ? disponible : '—'}</td>
+                <td>
+                    <input type="number" class="form-control form-control-sm ${excedeStock ? 'is-invalid' : ''}" data-role="cantidad" min="1" max="${disponible || 1}" value="${fila.cantidad}" ${repuesto ? '' : 'disabled'} ${nombreCantidad}>
+                    ${excedeStock ? `<div class="invalid-feedback d-block">Máximo disponible: ${disponible}</div>` : ''}
+                </td>
+                <td class="text-end" data-role="subtotal">${subtotal.toFixed(2)}</td>
+                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger" data-role="eliminar"><i class="bi bi-x-lg"></i></button></td>
+            `;
+
+            tr.querySelector('[data-role="repuesto"]').addEventListener('change', (e) => {
+                fila.repuestoId = e.target.value ? Number(e.target.value) : null;
+                fila.cantidad = 1;
+                render();
+            });
+
+            const inputCantidad = tr.querySelector('[data-role="cantidad"]');
+            if (inputCantidad) {
+                inputCantidad.addEventListener('input', (e) => {
+                    fila.cantidad = Math.max(1, parseInt(e.target.value || '1', 10));
+                    render();
+                });
+            }
+
+            tr.querySelector('[data-role="eliminar"]').addEventListener('click', () => eliminarFila(fila.rowId));
+
+            cuerpo.appendChild(tr);
+        });
+
+        totalTexto.textContent = `Subtotal repuestos: Bs ${total.toFixed(2)}`;
+    }
+
+    btnAgregar.addEventListener('click', () => agregarFila(null, 1));
+
+    document.getElementById('orden-form').addEventListener('submit', (e) => {
+        const invalida = filas.find((fila) => {
+            const repuesto = repuestoPorId(fila.repuestoId);
+            return repuesto && fila.cantidad > repuesto.disponible;
+        });
+
+        if (invalida) {
+            e.preventDefault();
+            alert('Hay repuestos con una cantidad mayor al stock disponible. Corrígelos antes de guardar.');
+        }
+    });
+
+    seleccionInicial.forEach((item) => agregarFila(item.id, item.cantidad));
+    render();
+})();
 </script>
 @endpush

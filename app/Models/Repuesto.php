@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Repuesto extends Model
 {
@@ -16,5 +17,12 @@ class Repuesto extends Model
     public function getStockBajoAttribute(): bool
     {
         return $this->stock <= $this->stock_minimo;
+    }
+
+    public function ordenesTrabajo(): BelongsToMany
+    {
+        return $this->belongsToMany(OrdenTrabajo::class, 'orden_trabajo_repuesto')
+            ->withPivot('cantidad', 'precio_unitario')
+            ->withTimestamps();
     }
 }

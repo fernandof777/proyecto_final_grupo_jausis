@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Repuesto;
-use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -46,13 +45,7 @@ class RepuestoController extends Controller
 
     public function destroy(Repuesto $repuesto): RedirectResponse
     {
-        try {
-            $repuesto->delete();
-        } catch (QueryException $exception) {
-            report($exception);
-
-            return back()->with('error', 'No se puede eliminar este repuesto porque ya está asociado a una o más órdenes de trabajo. Puedes marcarlo como inactivo en su lugar.');
-        }
+        $repuesto->delete();
 
         return back()->with('success', 'Repuesto eliminado.');
     }

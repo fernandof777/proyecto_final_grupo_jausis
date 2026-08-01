@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class OrdenTrabajo extends Model
 {
@@ -38,12 +37,5 @@ class OrdenTrabajo extends Model
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
-    }
-
-    public function repuestos(): BelongsToMany
-    {
-        return $this->belongsToMany(Repuesto::class, 'orden_trabajo_repuesto')
-            ->withPivot('cantidad', 'precio_unitario')
-            ->withTimestamps();
     }
 }
